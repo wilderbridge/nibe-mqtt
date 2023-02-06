@@ -26,7 +26,7 @@ class MqttConnection:
         self._availability_topic = f"{conf['prefix']}/availability"
 
         self._client = Client(
-            "nibe" + os.urandom(8).hex(),
+            "nibe-mqtt-" + conf["client_id"],
             protocol=conf["protocol"],
             transport="tcp",
         )
