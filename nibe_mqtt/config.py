@@ -64,6 +64,7 @@ schema = Schema(
             Optional("discovery_prefix", default="homeassistant"): str,
             Optional("prefix", default="nibe"): str,
             Required("host"): str,
+            Required("client_id"): str,
             Optional("port", default=1883): port,
             Inclusive("username", "auth"): str,
             Inclusive("password", "auth"): str,
