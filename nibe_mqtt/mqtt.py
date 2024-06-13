@@ -5,7 +5,7 @@ import os
 from abc import ABC, abstractmethod
 from typing import Union
 
-from nibe.coil import Coil
+from nibe.coil import Coil, CoilData
 from paho.mqtt.client import Client, MQTTMessage
 
 logger = logging.getLogger("nibe").getChild(__name__)
@@ -14,6 +14,9 @@ logger = logging.getLogger("nibe").getChild(__name__)
 class MqttHandler(ABC):
     @abstractmethod
     def handle_coil_set(self, name, value):
+        pass
+
+    def on_mqtt_connected(self):
         pass
 
 
@@ -36,10 +39,6 @@ class MqttConnection:
                 username=conf["username"], password=conf["password"]
             )
 
-        self._client.will_set(
-            self._availability_topic, "offline", retain=conf["retain_availability"]
-        )
-
         self._client.on_connect = self._on_connect_cb
         self._client.on_disconnect = self._on_disconnect_cb
         self._client.on_message = self._on_message_cb
@@ -47,10 +46,15 @@ class MqttConnection:
     def _on_connect_cb(self, client, userdata, flags, result, properties=None):
         logger.warning("MQTT connected")
 
+        self._client.will_set(
+            self._availability_topic, "offline", retain=self._conf["retain_availability"]
+        )
         self._client.publish(
             self._availability_topic, "online", retain=self._conf["retain_availability"]
         )
         self._client.subscribe(f"{self._conf['prefix']}/coils/+/set")
+
+        self._handler.on_mqtt_connected()
 
     def _on_disconnect_cb(self, client, userdata, rc, properties=None):
         logger.warning("MQTT disconnected")
@@ -75,10 +79,10 @@ class MqttConnection:
     def _get_coil_state_topic(self, coil: Coil):
         return f"{self._conf['prefix']}/coils/{coil.name}"
 
-    def publish_coil_state(self, coil: Coil):
+    def publish_coil_state(self, coil_data: CoilData):
         self._client.publish(
-            self._get_coil_state_topic(coil),
-            coil.value,
+            self._get_coil_state_topic(coil_data.coil),
+            coil_data.value,
             retain=self._conf["retain_state"],
         )
 
@@ -124,7 +128,7 @@ class MqttConnection:
             else:  # binary_sensor
                 component = "binary_sensor"
         elif coil.is_writable:  # switch
-            if coil.mappings:
+            if coil.has_mappings:
                 component = "select"
                 config["command_topic"] = f"{config['state_topic']}/set"
                 config["options"] = list(coil.reverse_mappings.keys())
